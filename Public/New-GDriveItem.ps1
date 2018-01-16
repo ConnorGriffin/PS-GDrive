@@ -27,7 +27,6 @@ Function New-GDriveItem {
     }
     $headers = Get-GAuthHeaders @gAuthParam
     $baseUri = 'https://www.googleapis.com/drive/v3'
-    $uploadUri = 'https://www.googleapis.com/upload/drive/v3'
 
     if ($TeamDriveName) {
         # Lookup all team drives, find the specified teamdrive by name, select the ID
@@ -108,33 +107,15 @@ Function New-GDriveItem {
         $sourceBytes = [System.IO.File]::ReadAllBytes($SourceItem.FullName)
         $sourceMime = [System.Web.MimeMapping]::GetMimeMapping([System.IO.FileInfo]$SourceItem.FullName)
 
-#
-$uploadBody= @"
---BOUNDARY
-Content-Type: application/json; charset=UTF-8
-
-{
-  "name": "Test",
-  "parents": [{
-    "id":"$parentId"
-    }],
-  "description": "Test"
-}
---BOUNDARY
-Content-Type: $sourceMime
-
-$source
---BOUNDARY--
-
-"@
-
         $uploadHeaders = @{
             "Authorization" = $headers.Authorization
-            "Content-type" = 'multipart/related; boundary="BOUNDARY"'
-            "Content-Length" = $uploadBody.Length}
+            "Content-type" = $sourceMime
+            "Content-Length" = $sourceBytes.Length
+        }
+        $uploadBody = $sourceBytes
 
         # Upload the file
-        $r = Invoke-RestMethod -Uri "$uploadUri/files?uploadType=multipart" -Method Post -Headers $uploadHeaders -Body $uploadBody
+        $r = Invoke-RestMethod -Uri "https://www.googleapis.com/upload/drive/v3?uploadType=media" -Method Post -Headers $uploadHeaders -Body $uploadBody
         Return $r
     }
 }
