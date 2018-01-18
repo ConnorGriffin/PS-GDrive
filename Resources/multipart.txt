@@ -7,6 +7,5 @@ $metadata
 Content-Transfer-Encoding: base64
 Content-Type: $mime
 
-
 $data
 --boundary--
