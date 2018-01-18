@@ -16,10 +16,10 @@ Function New-GDriveItem {
         [String]$ClientSecret
     )
 
-    # Split the path into individual folder names
+    Write-Verbose "Split the path into individual folder names"
     $pathArray = $Path.Trim('/').Split('/',[System.StringSplitOptions]::RemoveEmptyEntries)
 
-    # Create a new API session
+    Write-Verbose "Create a new API session"
     $gAuthParam = @{
         RefreshToken = $RefreshToken
         ClientID = $ClientID
@@ -29,11 +29,11 @@ Function New-GDriveItem {
     $baseUri = 'https://www.googleapis.com/drive/v3'
 
     if ($TeamDriveName) {
-        # Lookup all team drives, find the specified teamdrive by name, select the ID
+        Write-Verbose "Lookup all team drives, find the specified teamdrive by name, select the ID"
         $r = Invoke-RestMethod -Uri "$baseUri/teamdrives?fields=teamDrives(id,name)" -Method Get -Headers $headers
         $teamDriveId = $r.teamDrives.Where{$_.name -eq $TeamDriveName}.id
 
-        # Set the files.list parameters
+        Write-Verbose "Set the files.list parameters"
         $params = @(
             'corpora=teamDrive',
             'includeTeamDriveItems=true',
@@ -49,36 +49,36 @@ Function New-GDriveItem {
         )
     }
 
-    # Determine the target folder ID, create the path if it does not exist
+    Write-Verbose "Determine the target folder ID, create the path if it does not exist"
     if ($TeamDriveName) {$parentId = $teamDriveId}
     else {$parentid = 'root'}
     $pathArray.ForEach{
-        $name = $_
+        $folderName = $_
 
-        # List items with parentId from the previous iteration
+        Write-Verbose "List items with parentId from the previous iteration"
         $newParams = $params
         $newParams += "q=parents+in+'$parentId'"
         $r = Invoke-RestMethod -Uri "$baseUri/files?$($newParams -join '&')" -Method Get -Headers $headers
 
-        # Find the matching folder
+        Write-Verbose "Find the matching folder"
         $matchingFolder = $r.files.Where{
             $_.mimeType -eq 'application/vnd.google-apps.folder' -and
-            $_.name -eq $name
+            $_.name -eq $folderName
         }
 
-        # Set the parentId, create the folder if it doesn't exist
+        Write-Verbose "Set the parentId, create the folder if it doesn't exist"
         if ($matchingFolder) {
             $parentId = $matchingFolder.Id
         }
         else {
-            # Setup the folder creation request body
+            Write-Verbose "Setup the folder creation request body"
             $body = @{
-                name = $name
+                name = $folderName
                 mimeType = 'application/vnd.google-apps.folder'
                 parents = @($parentId)
             }
 
-            # Add context-specific parameters
+            Write-Verbose "Add context-specific parameters"
             if ($TeamDriveName) {
                 $body.Add('teamDriveId',$teamDriveId)
                 $supportsTeamDrives = 'true'
@@ -87,35 +87,52 @@ Function New-GDriveItem {
                 $supportsTeamDrives = 'false'
             }
 
-            # Convert the body to JSON
+            Write-Verbose "Convert the body to JSON"
             $bodyJson = $body | ConvertTo-Json
 
-            # Create the folder, set the parentId
+            Write-Verbose "Create the folder, set the parentId"
             $r = Invoke-RestMethod -Uri "$baseUri/files?supportsTeamDrives=$supportsTeamDrives" -Method Post -Headers $headers -Body $bodyJson
             $parentId = $r.id
         }
     }
 
-    # Return the created folder details
+    Write-Verbose "Return the created folder details"
     if ($ItemType -eq 'Directory') {
         Return $r
     }
-    # Upload the specified file
+    #Write-Verbose "Upload the specified file"
     else {
-        # Get the source file contents
+        Write-Verbose "Get the source file contents"
         $sourceItem = Get-Item $sourceFile
-        $sourceBytes = [System.IO.File]::ReadAllBytes($SourceItem.FullName)
-        $sourceMime = [System.Web.MimeMapping]::GetMimeMapping([System.IO.FileInfo]$SourceItem.FullName)
+        #$sourceBytes = Get-Content $sourceItem.FullName -Raw -ReadCount 0
+        #$sourceBytes = [System.IO.File]::ReadAllBytes($sourceItem.FullName)
+        $sourceBase64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($sourceItem.FullName))
+        $sourceMime = [System.Web.MimeMapping]::GetMimeMapping($sourceItem.FullName)
+
+        Write-Verbose "Set the file metadata"
+        $uploadMetadata = @{
+            originalFilename = $sourceItem.Name
+            parents = @($parentId)
+            description = $sourceItem.VersionInfo.FileDescription
+        }
+
+        # If specified, use $name for the file name in Google
+        if ($Name) {$uploadMetadata['name'] = $Name}
+        else {$uploadMetadata['name'] = $sourceItem.Name}
+
+        Write-Verbose "Insert the metadata, data, and MIME into the multipart body"
+        $uploadBody = Get-Content ~\Git-Repos\SO-Scripts\PSModules\GDrive\GDrive\Resources\multipart.txt -Raw
+        $uploadBody = $uploadBody.Replace('$metadata',($uploadMetadata | ConvertTo-Json))
+        $uploadBody = $uploadBody.Replace('$mime',$sourceMime).Replace('$data',$sourceBase64)
 
         $uploadHeaders = @{
             "Authorization" = $headers.Authorization
-            "Content-type" = $sourceMime
-            "Content-Length" = $sourceBytes.Length
+            "Content-Type" = 'multipart/related; boundary=boundary'
+            "Content-Length" = $uploadBody.Length
         }
-        $uploadBody = $sourceBytes
 
-        # Upload the file
-        $r = Invoke-RestMethod -Uri "https://www.googleapis.com/upload/drive/v3?uploadType=media" -Method Post -Headers $uploadHeaders -Body $uploadBody
+        Write-Verbose "Upload the file"
+        $r = Invoke-RestMethod -Uri "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart" -Method Post -Headers $uploadHeaders -Body ($uploadBody -join "`n")
         Return $r
     }
 }

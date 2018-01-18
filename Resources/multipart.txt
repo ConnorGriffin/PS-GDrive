@@ -1,0 +1,12 @@
+--boundary
+Content-Type: application/json; charset=UTF-8
+
+$metadata
+
+--boundary
+Content-Transfer-Encoding: base64
+Content-Type: $mime
+
+
+$data
+--boundary--
