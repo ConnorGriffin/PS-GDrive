@@ -35,11 +35,6 @@ Function New-GDriveItem {
     }
 
     # Create a new API session
-    $gAuthParam = @{
-        RefreshToken = $RefreshToken
-        ClientID = $ClientID
-        ClientSecret = $ClientSecret
-    }
     $headers = Get-GAuthHeaders @gAuthParam
     $baseUri = 'https://www.googleapis.com/drive/v3'
     $uploadUri = 'https://www.googleapis.com/upload/drive/v3'
