@@ -25,5 +25,8 @@ if (!(Test-Path $profilePath)) {
     New-Item -Path $profilePath -Type Directory | Out-Null
 }
 
-# Load/reload the GAuthProfile
-Initialize-GAuthProfile
+# If the profile exists, initialize, otherwise the user must do it manually (or specify OAuth2 data in each call)
+$gAuth = Get-GAuthProfile -ErrorAction SilentlyContinue
+if ($gAuth) {
+    Initialize-GAuthProfile
+}

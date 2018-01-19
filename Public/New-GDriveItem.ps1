@@ -2,12 +2,39 @@ Function New-GDriveItem {
     <#
     .SYNOPSIS
         Uploads files to Google Drive using the drive API, supports Team Drives
+    .PARAMETER Path
+        Specifies the path of the location of the new item.
+
+        You can specify the name of the new item in Name, or include it in Path (Directories only).
+    .PARAMETER Name
+        Specifies the name of the new item.
+
+        If not specified, the item's filename will be used
+    .PARAMETER ItemType
+         Specifies the provider-specified type of the new item.
+
+         Options are File and Directory.
+    .PARAMETER SourceFile
+        Specifies the file to upload to the specified path (File ItemType only).
+    .PARAMETER TeamDriveName
+        Specifies the Team Drive to upload the documents to.
+
+        If not included, 'My Drive' is used, rather than a team drive.
+    .PARAMETER UseContentAsIndexableText
+        Specifies whether or not the file content should be indexed by Google Drive.
+    .PARAMETER RefreshToken
+        Google API RefreshToken.
+    .PARAMETER ClientID
+        Google API ClientID.
+    .PARAMETER ClientSecret
+        Google API ClientSecret.
     #>
 
     # TODO: Add -Value support, setting content of a created file
     # TODO: Better error handling (e.g.: if a Teamdrive doesn't exist, error out)
     # TODO: Check for conflicting options (Directory, SourceFile), error out preemptively
     # TODO: Return better data, path to file, etc.
+    # TODO: Make Name and Path interchangeable, like the way New-Item works
 
     [CmdletBinding()]
     Param(
@@ -35,6 +62,11 @@ Function New-GDriveItem {
     }
 
     # Create a new API session
+    $gAuthParam = @{
+        RefreshToken = $RefreshToken
+        ClientID = $ClientID
+        ClientSecret = $ClientSecret
+    }
     $headers = Get-GAuthHeaders @gAuthParam
     $baseUri = 'https://www.googleapis.com/drive/v3'
     $uploadUri = 'https://www.googleapis.com/upload/drive/v3'
@@ -129,7 +161,7 @@ Function New-GDriveItem {
         else {$uploadMetadata['name'] = $sourceItem.Name}
 
         # Insert the metadata, data, and MIME into the multipart body
-        $uploadBody = Get-Content ~\Git-Repos\SO-Scripts\PSModules\GDrive\GDrive\Resources\multipart.txt -Raw
+        $uploadBody = Get-Content "$moduleRoot\Resources\multipart.txt" -Raw
         $uploadBody = $uploadBody.Replace('$metadata',($uploadMetadata | ConvertTo-Json))
         $uploadBody = $uploadBody.Replace('$mime',$sourceMime).Replace('$data',$sourceBase64)
 

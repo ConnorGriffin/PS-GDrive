@@ -11,7 +11,7 @@ Function Set-GAuthProfile {
         [Parameter(Mandatory=$true)][String]$ClientSecret
     )
 
-    $authData = @{
+    $authData = [PSCustomObject]@{
         RefreshToken = $RefreshToken
         ClientID = $ClientID
         ClientSecret = $ClientSecret
