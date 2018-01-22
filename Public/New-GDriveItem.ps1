@@ -28,6 +28,8 @@ Function New-GDriveItem {
         Google API ClientID.
     .PARAMETER ClientSecret
         Google API ClientSecret.
+    .PARAMETER Proxy
+        Specifies that the cmdlet uses a proxy server for the request, rather than connecting directly to the Internet resource. Enter the URI of a network proxy server.
     #>
 
     # TODO: Add -Value support, setting content of a created file
@@ -57,12 +59,13 @@ Function New-GDriveItem {
     if (!$ItemType -and $SourceFile) {$ItemType = 'File'}
     else {$ItemType = 'Directory'}
 
+    # Add the name to the path if the itemtype is Directory
     if ($Name -and $ItemType -eq 'Directory') {
         $pathArray += $Name
         Write-Verbose ($pathArray -join '/')
     }
 
-    # Create a new API session
+    # Create a new API session, set session defaults
     $gAuthParam = @{
         RefreshToken = $RefreshToken
         ClientID = $ClientID
@@ -70,8 +73,12 @@ Function New-GDriveItem {
     }
     if ($Proxy) {
         $gAuthParam['Proxy'] = $Proxy
+        $PSDefaultParameterValues['Invoke-RestMethod:Proxy'] = $Proxy
     }
     $headers = Get-GAuthHeaders @gAuthParam
+    $PSDefaultParameterValues['Invoke-RestMethod:Headers'] = $headers
+
+    # Set the google drive base URI
     $baseUri = 'https://www.googleapis.com/drive/v3'
     $uploadUri = 'https://www.googleapis.com/upload/drive/v3'
 
@@ -81,7 +88,7 @@ Function New-GDriveItem {
         $supportsTeamDrives = 'true'
 
         # Lookup all team drives, find the specified teamdrive by name, select the ID
-        $r = Invoke-RestMethod -Uri "$baseUri/teamdrives?fields=teamDrives(id,name)" -Method Get -Headers $headers
+        $r = Invoke-RestMethod -Uri "$baseUri/teamdrives?fields=teamDrives(id,name)" -Method Get
         $teamDriveId = $r.teamDrives.Where{$_.name -eq $TeamDriveName}.id
 
         # Set the files.list call parameters
@@ -111,7 +118,7 @@ Function New-GDriveItem {
         # List items with parentId from the previous iteration
         $newParams = $params
         $newParams += "q=trashed%3Dfalse and parents+in+'$parentId'"
-        $r = Invoke-RestMethod -Uri "$baseUri/files?$($newParams -join '&')" -Method Get -Headers $headers
+        $r = Invoke-RestMethod -Uri "$baseUri/files?$($newParams -join '&')" -Method Get
 
         # Find the matching folder
         $matchingFolder = $r.files.Where{
@@ -138,7 +145,7 @@ Function New-GDriveItem {
             $bodyJson = $body | ConvertTo-Json
 
             # Create the folder, set the parentId, return the object details
-            $r = Invoke-RestMethod -Uri "$baseUri/files?supportsTeamDrives=$supportsTeamDrives" -Method Post -Headers $headers -Body $bodyJson
+            $r = Invoke-RestMethod -Uri "$baseUri/files?supportsTeamDrives=$supportsTeamDrives" -Method Post -Body $bodyJson
             $parentId = $r.id
             $r
         }
