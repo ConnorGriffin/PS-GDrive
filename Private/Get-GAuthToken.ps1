@@ -10,7 +10,8 @@ function Get-GAuthToken {
     Param(
         [String]$RefreshToken,
         [String]$ClientID,
-        [String]$ClientSecret
+        [String]$ClientSecret,
+        [String]$Proxy
     )
 
     $params = @{
@@ -23,6 +24,9 @@ function Get-GAuthToken {
         ) -join '&'
         Method = 'Post'
         ContentType = 'application/x-www-form-urlencoded'
+    }
+    if ($Proxy) {
+        $params['Proxy'] = $Proxy
     }
 
     Invoke-RestMethod @params

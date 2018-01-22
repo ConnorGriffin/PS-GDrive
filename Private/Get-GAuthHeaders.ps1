@@ -20,6 +20,9 @@ function Get-GAuthHeaders {
         ClientID = $ClientID
         ClientSecret = $ClientSecret
     }
+    if ($Proxy) {
+        $gAuthParam['Proxy'] = $Proxy
+    }
     $accessToken = Get-GAuthToken @gAuthParam
 
     Return @{
