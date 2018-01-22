@@ -8,7 +8,8 @@ Function Set-GAuthProfile {
     Param(
         [Parameter(Mandatory=$true)][String]$RefreshToken,
         [Parameter(Mandatory=$true)][String]$ClientID,
-        [Parameter(Mandatory=$true)][String]$ClientSecret
+        [Parameter(Mandatory=$true)][String]$ClientSecret,
+        [String]$Proxy
     )
 
     $authData = [PSCustomObject]@{
@@ -16,5 +17,9 @@ Function Set-GAuthProfile {
         ClientID = $ClientID
         ClientSecret = $ClientSecret
     }
+    if ($Proxy) {
+        $authData['Proxy'] = $Proxy
+    }
+    
     $authData | Export-Clixml "$profilePath\GDriveAuth.xml"
 }

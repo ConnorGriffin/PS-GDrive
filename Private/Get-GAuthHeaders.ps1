@@ -10,7 +10,8 @@ function Get-GAuthHeaders {
     Param(
         [String]$RefreshToken,
         [String]$ClientID,
-        [String]$ClientSecret
+        [String]$ClientSecret,
+        [String]$Proxy
     )
 
     # Get an access token

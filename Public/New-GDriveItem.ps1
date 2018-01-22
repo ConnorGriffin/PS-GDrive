@@ -46,7 +46,8 @@ Function New-GDriveItem {
         [Bool]$UseContentAsIndexableText=$true,
         [String]$RefreshToken,
         [String]$ClientID,
-        [String]$ClientSecret
+        [String]$ClientSecret,
+        [String]$Proxy
     )
 
     # Split the path into individual folder names
@@ -66,6 +67,9 @@ Function New-GDriveItem {
         RefreshToken = $RefreshToken
         ClientID = $ClientID
         ClientSecret = $ClientSecret
+    }
+    if ($Proxy) {
+        $gAuthParam['Proxy'] = $Proxy
     }
     $headers = Get-GAuthHeaders @gAuthParam
     $baseUri = 'https://www.googleapis.com/drive/v3'

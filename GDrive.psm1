@@ -25,8 +25,22 @@ if (!(Test-Path $profilePath)) {
     New-Item -Path $profilePath -Type Directory | Out-Null
 }
 
-# If the profile exists, initialize, otherwise the user must do it manually (or specify OAuth2 data in each call)
-$gAuth = Get-GAuthProfile -ErrorAction SilentlyContinue
-if ($gAuth) {
-    Initialize-GAuthProfile
+# Import the config, if one has been set
+if (Test-Path "$profilePath\GDriveAuth.xml") {
+    $gAuth = Import-Clixml "$profilePath\GDriveAuth.xml"
+
+    # Set default parameters for the rest of the script functions
+    $global:PSDefaultParameterValues['*GDrive*:RefreshToken'] = $gAuth.RefreshToken
+    $global:PSDefaultParameterValues['*GAuth*:RefreshToken'] = $gAuth.RefreshToken
+
+    $global:PSDefaultParameterValues['*GDrive*:ClientID'] = $gAuth.ClientID
+    $global:PSDefaultParameterValues['*GAuth*:ClientID'] = $gAuth.ClientID
+
+    $global:PSDefaultParameterValues['*GDrive*:ClientSecret'] = $gAuth.ClientSecret
+    $global:PSDefaultParameterValues['*GAuth*:ClientSecret'] = $gAuth.ClientSecret
+
+    if($gAuth.Proxy) {
+        $global:PSDefaultParameterValues['*GDrive*:Proxy'] = $gAuth.Proxy
+        $global:PSDefaultParameterValues['*GAuth*:Proxy'] = $gAuth.Proxy
+    }
 }
