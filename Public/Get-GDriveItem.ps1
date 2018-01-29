@@ -31,7 +31,7 @@ Function Get-GDriveItem {
         [String]$Path,
         [String]$Name,
         [String]$TeamDriveName,
-        [String]$DestinationPath,
+        [String]$DestinationPath='.',
         [String]$RefreshToken,
         [String]$ClientID,
         [String]$ClientSecret,
