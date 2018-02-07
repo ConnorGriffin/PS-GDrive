@@ -30,14 +30,9 @@ if (Test-Path "$profilePath\GDriveAuth.xml") {
     $gAuth = Import-Clixml "$profilePath\GDriveAuth.xml"
 
     # Set default parameters for the rest of the script functions
-    $global:PSDefaultParameterValues['*GDrive*:RefreshToken'] = $gAuth.RefreshToken
-    $global:PSDefaultParameterValues['*GAuth*:RefreshToken'] = $gAuth.RefreshToken
-
-    $global:PSDefaultParameterValues['*GDrive*:ClientID'] = $gAuth.ClientID
-    $global:PSDefaultParameterValues['*GAuth*:ClientID'] = $gAuth.ClientID
-
-    $global:PSDefaultParameterValues['*GDrive*:ClientSecret'] = $gAuth.ClientSecret
-    $global:PSDefaultParameterValues['*GAuth*:ClientSecret'] = $gAuth.ClientSecret
+    $global:PSDefaultParameterValues['*:RefreshToken'] = $gAuth.RefreshToken
+    $global:PSDefaultParameterValues['*:ClientID'] = $gAuth.ClientID
+    $global:PSDefaultParameterValues['*:ClientSecret'] = $gAuth.ClientSecret
 
     if($gAuth.Proxy) {
         $global:PSDefaultParameterValues['*GDrive*:Proxy'] = $gAuth.Proxy
