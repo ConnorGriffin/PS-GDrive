@@ -94,7 +94,7 @@ Function Get-GDriveItem {
     if ($supportsTeamDrives -eq 'true') {$parentId = $teamDriveId}
     else {$parentid = 'root'}
 
-    # Iterate through each part of the path, create the folder if it does not exist
+    # Iterate through each part of the path, getting the next level until we reach the bottom
     foreach ($folderName in $pathArray) {
         # List items with parentId from the previous iteration
         $newParams = $params
@@ -107,7 +107,7 @@ Function Get-GDriveItem {
             $_.name -eq $folderName
         }
 
-        # Set the parentId, create the folder if it doesn't exist
+        # Set the parentId for the next loop or part of the script
         if ($matchingFolder) {
             $parentId = $matchingFolder.Id
         }
