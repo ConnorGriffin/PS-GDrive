@@ -3,7 +3,7 @@ Function Get-GDriveChildItem {
     .SYNOPSIS
         List files in Google Drive using the drive API, supports Team Drives
     .PARAMETER Path
-        Specifies the path of the location of the item to list.
+        Specifies a path to one or more locations. Wildcards are permitted. The default location is the root directory.
     .PARAMETER TeamDriveName
         Specifies the Team Drive to download the file from.
 
@@ -20,9 +20,8 @@ Function Get-GDriveChildItem {
 
     [CmdletBinding()]
     Param(
-        [String]$Path,
+        [String]$Path='*',
         [String]$TeamDriveName,
-        [String]$DestinationPath='.',
         [String]$RefreshToken,
         [String]$ClientID,
         [String]$ClientSecret,
@@ -42,11 +41,22 @@ Function Get-GDriveChildItem {
     $headers = Get-GAuthHeaders @gAuthParam
     $PSDefaultParameterValues['Invoke-RestMethod:Headers'] = $headers
 
-    # Set the google drive base URI
-    $baseUri = 'https://www.googleapis.com/drive/v3'
-
     # Split the path into individual folder names
     $pathArray = $Path.Trim('/\').Split('/\',[System.StringSplitOptions]::RemoveEmptyEntries)
+
+    # If the last part of the path contains a wildcard, make that a filter, not a part of the path
+    if ($pathArray[$pathArray.Count-1].Contains('*')) {
+        if ($pathArray.Count -le 1) {
+            $nameFilter = $pathArray[$pathArray.Count-1]
+            $pathArray = $null
+        }
+        else {
+            $nameFilter = $pathArray[$pathArray.Count-1]
+            $pathArray = $pathArray[0..($pathArray.Count-2)]
+        }
+    } else {
+        $nameFilter = '*'
+    }
 
     # Get the team drive details if a TeamDriveName is specified
     if ($TeamDriveName) {
@@ -67,7 +77,7 @@ Function Get-GDriveChildItem {
         )
     }
     else {
-        # Set for future API calls
+        # Set the files.list call parameters
         $supportsTeamDrives = 'false'
         $params = @(
             'corpora=user'
@@ -80,7 +90,7 @@ Function Get-GDriveChildItem {
     else {$parentid = 'root'}
 
     # Iterate through each part of the path, getting the next level until we reach the bottom
-    foreach ($folderName in $pathArray) {
+    foreach ($pathItem in $pathArray) {
         # List items with parentId from the previous iteration
         $newParams = $params
         $newParams += "q=trashed%3Dfalse and parents+in+'$parentId'"
@@ -89,7 +99,7 @@ Function Get-GDriveChildItem {
         # Find the matching folder
         $matchingFolder = $r.files.Where{
             $_.mimeType -eq 'application/vnd.google-apps.folder' -and
-            $_.name -eq $folderName
+            $_.name -eq $pathItem
         }
 
         # Set the parentId for the next loop or part of the script
@@ -101,6 +111,7 @@ Function Get-GDriveChildItem {
     # Now that we have a parentId, list the files
     $newParams = $params
     $newParams += "q=trashed%3Dfalse and parents+in+'$parentId'"
+
     $files = Invoke-RestMethod -Uri "$baseUri/files?$($newParams -join '&')" -Method Get
-    Return $files.files
+    Return $files.files.Where{$_.name -like $nameFilter}
 }
