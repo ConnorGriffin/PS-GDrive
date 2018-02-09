@@ -78,10 +78,6 @@ Function New-GDriveItem {
     $headers = Get-GAuthHeaders @gAuthParam
     $PSDefaultParameterValues['Invoke-RestMethod:Headers'] = $headers
 
-    # Set the google drive base URI
-    $baseUri = 'https://www.googleapis.com/drive/v3'
-    $uploadUri = 'https://www.googleapis.com/upload/drive/v3'
-
     # Get the team drive details if a TeamDriveName is specified
     if ($TeamDriveName) {
         # Set for future API calls

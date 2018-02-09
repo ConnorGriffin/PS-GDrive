@@ -17,7 +17,10 @@ $functions.ForEach{
     catch {Write-Error -Message "Failed to import function $($_.FullName)"}
 }
 
+# Set module variables
 $moduleRoot = $PSScriptRoot
+$baseUri = 'https://www.googleapis.com/drive/v3'
+$uploadUri = 'https://www.googleapis.com/upload/drive/v3'
 
 # Create Profiles path if it does not exist
 $profilePath = "$ENV:APPDATA\PSModules\GDrive"
