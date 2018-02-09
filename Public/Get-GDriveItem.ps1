@@ -26,15 +26,30 @@ Function Get-GDriveItem {
         Specifies that the cmdlet uses a proxy server for the request, rather than connecting directly to the Internet resource. Enter the URI of a network proxy server.
     #>
 
-    [CmdletBinding()]
+    # TODO: Add FileID support (download by specifying a file ID)
+    # TODO: Add recurse support, download entire directory including children
+
+    [CmdletBinding(DefaultParameterSetName='ByPath')]
     Param(
-        [String]$Path,
-        [String]$Name,
         [String]$TeamDriveName,
+
+        [Parameter(Mandatory=$true,ParameterSetName='ByPath')]
+        [String]$Path,
+
+        [Parameter(Mandatory=$true,ParameterSetName='ByName')]
+        [String]$Name,
+
+        #[Parameter(Mandatory=$true,ParameterSetName='ById')]
+        #[String[]]$FileId,
+
         [String]$DestinationPath='.',
+
         [String]$RefreshToken,
+
         [String]$ClientID,
+
         [String]$ClientSecret,
+
         [String]$Proxy
     )
 
@@ -51,91 +66,36 @@ Function Get-GDriveItem {
     $headers = Get-GAuthHeaders @gAuthParam
     $PSDefaultParameterValues['Invoke-RestMethod:Headers'] = $headers
 
-    # Set the google drive base URI
-    $baseUri = 'https://www.googleapis.com/drive/v3'
-
-    # Split the path into individual folder names
-    $pathArray = $Path.Trim('/\').Split('/\',[System.StringSplitOptions]::RemoveEmptyEntries)
-
-    # Use the last part of the Path for Name if no Name is specified
-    if (!$Name) {
-        $Name = $pathArray[($pathArray.Count - 1)]
-        $pathArray = $pathArray[0..($pathArray.Count - 2)]
-    }
-
-    # Get the team drive details if a TeamDriveName is specified
+    # Set teamdrive string for API calls
     if ($TeamDriveName) {
-        # Set for future API calls
         $supportsTeamDrives = 'true'
-
-        # Lookup all team drives, find the specified teamdrive by name, select the ID
-        $r = Invoke-RestMethod -Uri "$baseUri/teamdrives?fields=teamDrives(id,name)" -Method Get
-        $teamDriveId = $r.teamDrives.Where{$_.name -eq $TeamDriveName}.id
-
-        # Set the files.list call parameters
-        $params = @(
-            'corpora=teamDrive',
-            'includeTeamDriveItems=true',
-            'supportsTeamDrives=true'
-            "teamDriveId=$teamDriveId"
-            'fields=files(id%2CmimeType%2Cname%2Cparents)'
-        )
+        $teamDrive = @{TeamDriveName = $TeamDriveName}
     }
-    else {
-        # Set for future API calls
-        $supportsTeamDrives = 'false'
-        $params = @(
-            'corpora=user'
-            'fields=files(id%2CmimeType%2Cname%2Cparents)'
-        )
-    }
+    else {$supportsTeamDrives = 'false'}
 
-    # Determine the target folder ID, create the path if it does not exist
-    if ($supportsTeamDrives -eq 'true') {$parentId = $teamDriveId}
-    else {$parentid = 'root'}
+    [Array]$filesToDownload = Get-GDriveChildItem -Path "$Path\$Name" @teamDrive @gAuthParam
 
-    # Iterate through each part of the path, getting the next level until we reach the bottom
-    foreach ($folderName in $pathArray) {
-        # List items with parentId from the previous iteration
-        $newParams = $params
-        $newParams += "q=trashed%3Dfalse and parents+in+'$parentId'"
-        $r = Invoke-RestMethod -Uri "$baseUri/files?$($newParams -join '&')" -Method Get
-
-        # Find the matching folder
-        $matchingFolder = $r.files.Where{
-            $_.mimeType -eq 'application/vnd.google-apps.folder' -and
-            $_.name -eq $folderName
+    # Download/export each file
+    $filesToDownload.Where{$_.mimetype -ne 'application/vnd.google-apps.folder'}.ForEach{
+        # Export google app files
+        if ($_.mimetype -like 'application/vnd.google-apps.*') {
+            # Determine which mimeType to use when exporting the files
+            switch ($_.mimetype) {
+                'application/vnd.google-apps.document' {$exportMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}
+                'application/vnd.google-apps.presentation' {$exportMime = 'application/vnd.openxmlformats-officedocument.presentationml.presentation'}
+                'application/vnd.google-apps.spreadsheet' {$exportMime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}
+                'application/vnd.google-apps.drawings' {$exportMime = 'image/png'}
+                'application/vnd.google-apps.script' {$exportMime = 'application/vnd.google-apps.script+json'}
+            }
+            $params = "supportsTeamDrives=$supportsTeamDrives&mimeType=$exportMime"
+            Invoke-RestMethod -Uri "$baseUri/files/$($_.id)/export?$params" -Method Get -OutFile "$DestinationPath\$($_.name)"
+        }
+        # Download binary files
+        else {
+            Invoke-RestMethod -Uri "$baseUri/files/$($_.id)?supportsTeamDrives=$supportsTeamDrives&alt=media" -Method Get -OutFile "$DestinationPath\$($_.name)"
         }
 
-        # Set the parentId for the next loop or part of the script
-        if ($matchingFolder) {
-            $parentId = $matchingFolder.Id
-        }
+        # Return the exported file
+        Get-Item "$DestinationPath\$($_.name)"
     }
-
-    # Now that we have a parentId, find the file name
-    $newParams = $params
-    $newParams += "q=trashed%3Dfalse and parents+in+'$parentId' and name='$Name'"
-    $fileToDownload = Invoke-RestMethod -Uri "$baseUri/files?$($newParams -join '&')" -Method Get
-
-    # Export google app files
-    if ($fileToDownload.files.mimetype -like 'application/vnd.google-apps.*') {
-        # Determine which mimeType to use when exporting the files
-        switch ($fileToDownload.files.mimetype) {
-            'application/vnd.google-apps.document' {$exportMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}
-            'application/vnd.google-apps.presentation' {$exportMime = 'application/vnd.openxmlformats-officedocument.presentationml.presentation'}
-            'application/vnd.google-apps.spreadsheet' {$exportMime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}
-            'application/vnd.google-apps.drawings' {$exportMime = 'image/png'}
-            'application/vnd.google-apps.script' {$exportMime = 'application/vnd.google-apps.script+json'}
-        }
-        $params = "supportsTeamDrives=$supportsTeamDrives&mimeType=$exportMime"
-        Invoke-RestMethod -Uri "$baseUri/files/$($fileToDownload.files.id)/export?$params" -Method Get -OutFile "$DestinationPath\$Name"
-    }
-    # Download binary files
-    else {
-        Invoke-RestMethod -Uri "$baseUri/files/$($fileToDownload.files.id)?supportsTeamDrives=$supportsTeamDrives&alt=media" -Method Get -OutFile "$DestinationPath\$Name"
-    }
-
-    # Return the exported file
-    Get-Item "$DestinationPath\$Name"
 }
