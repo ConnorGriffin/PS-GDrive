@@ -8,7 +8,7 @@ Function Get-GDriveChildItem {
         Specifies the Team Drive to download the file from.
 
         If not included, 'My Drive' is used, rather than a team drive.
-    .PARAMETER Recurse 
+    .PARAMETER Recurse
         If specified, items in child directories will be listed.
     .PARAMETER RefreshToken
         Google API RefreshToken.
@@ -121,11 +121,11 @@ Function Get-GDriveChildItem {
 
     # If Recurse is specified, reprocess for each folder in the current path
     if ($Recurse) {
-        $folders = $files.Where{$_.mimeType -eq 'application/vnd.google-apps.folder'}
+        $folders = [Array]$files.Where{$_.mimeType -eq 'application/vnd.google-apps.folder'}
         $folders.ForEach{
             $recurseParams = $PSBoundParameters
-            $recurseParams['Path'] = "$($recurseParams['Path'])\$($_.name)"
-            $files += (Get-GDriveChildItem @recurseParams)
+            $recurseParams['Path'] = "$($pathArray -join '\')\$($_.name)"
+            $files += Get-GDriveChildItem @recurseParams
         }
     }
 
