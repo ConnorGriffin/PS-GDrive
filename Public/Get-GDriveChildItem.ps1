@@ -109,6 +109,9 @@ Function Get-GDriveChildItem {
         if ($matchingFolder) {
             $parentId = $matchingFolder.Id
         }
+        else {
+            Write-Error "Unable to find $Path"
+        }
     }
 
     # Now that we have a parentId, list the files
