@@ -14,6 +14,8 @@ Function Get-GDriveItem {
         Specifies the Team Drive to download the file from.
 
         If not included, 'My Drive' is used, rather than a team drive.
+    .PARAMETER Recurse
+        If specified, items in child directories will be downloaded.
     .PARAMETER DestinationPath
         Specifies where the downloaded files will be placed. Path only, the files name in Drive will be used.
     .PARAMETER RefreshToken
@@ -38,6 +40,10 @@ Function Get-GDriveItem {
 
         [Parameter(Mandatory=$true,ParameterSetName='ByName')]
         [String]$Name,
+
+        [Parameter(ParameterSetName='ByName')]
+        [Parameter(ParameterSetName='ByPath')]
+        [Switch]$Recurse,
 
         #[Parameter(Mandatory=$true,ParameterSetName='ById')]
         #[String[]]$FileId,
@@ -66,14 +72,16 @@ Function Get-GDriveItem {
     $headers = Get-GAuthHeaders @gAuthParam
     $PSDefaultParameterValues['Invoke-RestMethod:Headers'] = $headers
 
-    # Set teamdrive string for API calls
+    # Set optional parameters for the Get-GDriveChildItem function call
+    $childItemParams = @{}
+    if ($Recurse) {$childItemParams['Recurse'] = $true}
     if ($TeamDriveName) {
         $supportsTeamDrives = 'true'
-        $teamDrive = @{TeamDriveName = $TeamDriveName}
+        $childItemParams['TeamDriveName'] = $TeamDriveName
     }
     else {$supportsTeamDrives = 'false'}
 
-    [Array]$filesToDownload = Get-GDriveChildItem -Path "$Path\$Name" @teamDrive @gAuthParam
+    [Array]$filesToDownload = Get-GDriveChildItem -Path "$Path\$Name" @childItemParams @gAuthParam
 
     # Download/export each file
     $filesToDownload.Where{$_.mimetype -ne 'application/vnd.google-apps.folder'}.ForEach{
