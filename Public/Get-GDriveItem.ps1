@@ -83,27 +83,60 @@ Function Get-GDriveItem {
 
     [Array]$filesToDownload = Get-GDriveChildItem -Path "$Path\$Name" @childItemParams @gAuthParam
 
+    # If Name is specified, filter for that name
+    if ($Name) {
+        [Array]$filesToDownload = $filesToDownload.Where{$_.Name -like $Name}
+    }
+
+    <# If the last part of the path matches the name of a file, assume that's what we intend to download
+       This is needed because gsuite native formts (gsheet, gdoc, etc.) don't have extensions in the name
+       As a result, the Get-GDriveChildItem function thinks they're folders, and returns odd results #>
+    $pathArray = $Path.Trim('/\').Split('/\',[System.StringSplitOptions]::RemoveEmptyEntries)
+    $lastPath = $pathArray[$pathArray.Count-1]
+    [Array]$itemMatchesLastPath = $filesToDownload.Where{$_.Name -like $lastPath}
+    if ($itemMatchesLastPath) {
+        [Array]$filesToDownload = $filesToDownload.Where{$_.Name -like $lastPath}
+    }
+
     # Download/export each file
     $filesToDownload.Where{$_.mimetype -ne 'application/vnd.google-apps.folder'}.ForEach{
         # Export google app files
         if ($_.mimetype -like 'application/vnd.google-apps.*') {
             # Determine which mimeType to use when exporting the files
             switch ($_.mimetype) {
-                'application/vnd.google-apps.document' {$exportMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}
-                'application/vnd.google-apps.presentation' {$exportMime = 'application/vnd.openxmlformats-officedocument.presentationml.presentation'}
-                'application/vnd.google-apps.spreadsheet' {$exportMime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}
-                'application/vnd.google-apps.drawings' {$exportMime = 'image/png'}
-                'application/vnd.google-apps.script' {$exportMime = 'application/vnd.google-apps.script+json'}
+                'application/vnd.google-apps.document' {
+                    $exportMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                    $exportExt = '.docx'
+                }
+                'application/vnd.google-apps.presentation' {
+                    $exportMime = 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+                    $exportExt = '.pptx'
+                }
+                'application/vnd.google-apps.spreadsheet' {
+                    $exportMime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    $exportExt = '.xlsx'
+                }
+                'application/vnd.google-apps.drawings' {
+                    $exportMime = 'image/png'
+                    $exportExt = '.png'
+                }
+                'application/vnd.google-apps.script' {
+                    $exportMime = 'application/vnd.google-apps.script+json'
+                    $exportExt = '.json'
+                }
             }
             $params = "supportsTeamDrives=$supportsTeamDrives&mimeType=$exportMime"
-            Invoke-RestMethod -Uri "$baseUri/files/$($_.id)/export?$params" -Method Get -OutFile "$DestinationPath\$($_.name)"
+            $exportFileName = "$DestinationPath\$($_.name)$exportExt"
+            Invoke-RestMethod -Uri "$baseUri/files/$($_.id)/export?$params" -Method Get -OutFile $exportFileName
+
         }
         # Download binary files
         else {
-            Invoke-RestMethod -Uri "$baseUri/files/$($_.id)?supportsTeamDrives=$supportsTeamDrives&alt=media" -Method Get -OutFile "$DestinationPath\$($_.name)"
+            $exportFileName = "$DestinationPath\$($_.name)"
+            Invoke-RestMethod -Uri "$baseUri/files/$($_.id)?supportsTeamDrives=$supportsTeamDrives&alt=media" -Method Get -OutFile $exportFileName
         }
 
         # Return the exported file
-        Get-Item "$DestinationPath\$($_.name)"
+        Get-Item $exportFileName
     }
 }
