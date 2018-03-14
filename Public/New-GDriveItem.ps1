@@ -120,7 +120,7 @@ Function New-GDriveItem {
         $matchingFolder = $r.files.Where{
             $_.mimeType -eq 'application/vnd.google-apps.folder' -and
             $_.name -eq $folderName
-        }
+        }[0]
 
         # Set the parentId, create the folder if it doesn't exist
         if ($matchingFolder) {
