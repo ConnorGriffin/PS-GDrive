@@ -84,7 +84,7 @@ Function New-GDriveItem {
         $supportsTeamDrives = 'true'
 
         # Lookup all team drives, find the specified teamdrive by name, select the ID
-        $r = Invoke-RestMethod -Uri "$baseUri/teamdrives?fields=teamDrives(id,name)" -Method Get
+        $r = Invoke-PaginatedRestMethod -Uri "$baseUri/teamdrives?fields=nextPageToken,teamDrives(id,name)" -Method Get
         $teamDriveId = $r.teamDrives.Where{$_.name -eq $TeamDriveName}.id
 
         # Set the files.list call parameters
@@ -93,7 +93,7 @@ Function New-GDriveItem {
             'includeTeamDriveItems=true',
             'supportsTeamDrives=true'
             "teamDriveId=$teamDriveId"
-            'fields=files(id%2CmimeType%2Cname%2Cparents)'
+            'fields=nextPageToken,files(id%2CmimeType%2Cname%2Cparents)'
         )
     }
     else {
@@ -101,7 +101,7 @@ Function New-GDriveItem {
         $supportsTeamDrives = 'false'
         $params = @(
             'corpora=user'
-            'fields=files(id%2CmimeType%2Cname%2Cparents)'
+            'fields=nextPageToken,files(id%2CmimeType%2Cname%2Cparents)'
         )
     }
 

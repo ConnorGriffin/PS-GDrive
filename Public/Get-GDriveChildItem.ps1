@@ -31,6 +31,11 @@ Function Get-GDriveChildItem {
         [String]$Proxy
     )
 
+    # Sets path to * if the provided path is one of: (blank),\,/
+    if ($Path -match '^\\$|^/$|^$') {
+        $Path = '*'
+    }
+
     # Create a new API session, set session defaults
     $gAuthParam = @{
         RefreshToken = $RefreshToken
@@ -67,7 +72,7 @@ Function Get-GDriveChildItem {
         $supportsTeamDrives = 'true'
 
         # Lookup all team drives, find the specified teamdrive by name, select the ID
-        $r = Invoke-RestMethod -Uri "$baseUri/teamdrives?fields=teamDrives(id,name)" -Method Get
+        $r = Invoke-PaginatedRestMethod -Uri "$baseUri/teamdrives?fields=nextPageToken,teamDrives(id,name)" -Method Get
         $teamDriveId = $r.teamDrives.Where{$_.name -eq $TeamDriveName}.id
 
         # Set the files.list call parameters
@@ -76,7 +81,7 @@ Function Get-GDriveChildItem {
             'includeTeamDriveItems=true',
             'supportsTeamDrives=true'
             "teamDriveId=$teamDriveId"
-            'fields=files(id%2CmimeType%2Cname%2Cparents)'
+            'fields=nextPageToken,files(id%2CmimeType%2Cname%2Cparents)'
         )
     }
     else {
@@ -84,7 +89,7 @@ Function Get-GDriveChildItem {
         $supportsTeamDrives = 'false'
         $params = @(
             'corpora=user'
-            'fields=files(id%2CmimeType%2Cname%2Cparents)'
+            'fields=nextPageToken,files(id%2CmimeType%2Cname%2Cparents)'
         )
     }
 
@@ -97,7 +102,7 @@ Function Get-GDriveChildItem {
         # List items with parentId from the previous iteration
         $newParams = $params
         $newParams += "q=trashed%3Dfalse and parents+in+'$parentId'"
-        $r = Invoke-RestMethod -Uri "$baseUri/files?$($newParams -join '&')" -Method Get
+        $r = Invoke-PaginatedRestMethod -Uri "$baseUri/files?$($newParams -join '&')" -Method Get
 
         # Find the matching folder
         $matchingFolder = $r.files.Where{
@@ -120,7 +125,7 @@ Function Get-GDriveChildItem {
 
     # Add the results to a PSObject
     $files = @()
-    $files += (Invoke-RestMethod -Uri "$baseUri/files?$($newParams -join '&')" -Method Get).files
+    $files += (Invoke-PaginatedRestMethod -Uri "$baseUri/files?$($newParams -join '&')" -Method Get).files
 
     # If Recurse is specified, reprocess for each folder in the current path
     if ($Recurse) {
