@@ -20,6 +20,14 @@ function Export-GSheet {
     .PARAMETER ReturnSheet 
         Output the sheet object rather than uploading to Google Drive. 
         Output from this command can be used in the $Sheet variable to create a multi-sheet spreadsheet.
+    .PARAMETER RefreshToken
+        Google API RefreshToken.
+    .PARAMETER ClientID
+        Google API ClientID.
+    .PARAMETER ClientSecret
+        Google API ClientSecret.
+    .PARAMETER Proxy
+        Specifies that the cmdlet uses a proxy server for the request, rather than connecting directly to the Internet resource. Enter the URI of a network proxy server.
     .EXAMPLE
         PS C:\> <example usage>
         Explanation of what the example does
@@ -71,10 +79,39 @@ function Export-GSheet {
         [Parameter(ParameterSetName='ReturnSheet',
                    Mandatory=$true)]
         [Switch]
-        $ReturnSheet
+        $ReturnSheet,
+
+        [Parameter(Mandatory=$true)]
+        [String]
+        $RefreshToken,
+        
+        [Parameter(Mandatory=$true)]
+        [String]
+        $ClientID,
+        
+        [Parameter(Mandatory=$true)]
+        [String]
+        $ClientSecret,
+        
+        [String]
+        $Proxy
     )
 
     begin {
+        # Create a new API session, set session defaults
+        $gAuthParam = @{
+            RefreshToken = $RefreshToken
+            ClientID = $ClientID
+            ClientSecret = $ClientSecret
+        }
+        if ($Proxy) {
+            $gAuthParam['Proxy'] = $Proxy
+            $PSDefaultParameterValues['Invoke-RestMethod:Proxy'] = $Proxy
+        }
+        $headers = Get-GAuthHeaders @gAuthParam
+        $PSDefaultParameterValues['Invoke-RestMethod:Headers'] = $headers
+
+        # Init variables
         $valueData = @()
         $sheetArray = @()
         $firstRun = $true
@@ -175,19 +212,11 @@ function Export-GSheet {
         
         $jsonBody = $body | ConvertTo-Json -Depth 20 -Compress
 
-        # Set the upload headers
-        $uploadHeaders = @{
-            "Authorization" = $headers.Authorization
-            "Content-Type" = 'application/json; charset=UTF-8'
-            "Content-Length" = $jsonBody.Length
-        }
-
         # Splat the invoke-restmethod parameters for easy reading
         $restParams = @{
             Uri = 'https://sheets.googleapis.com/v4/spreadsheets/'
             Method = 'POST'
             Body = $jsonBody
-            Headers = $uploadHeaders 
             TimeoutSec = 60
         }
 
