@@ -61,7 +61,7 @@ function Export-GSheet {
         [Parameter(Position=1,
                    ParameterSetName='ReturnSheet')]
         [String]
-        $SheetName = 'Sheet1',
+        $SheetName,
 
         [Parameter(Position=2,
                    ParameterSetName='SingleSheet')]
@@ -70,9 +70,13 @@ function Export-GSheet {
         [String]
         $SpreadsheetName,
 
+        [Parameter(ParameterSetName='SingleSheet')]
+        [Parameter(ParameterSetName='ReturnSheet')]
         [Switch]
         $NoHeader,
 
+        [Parameter(ParameterSetName='SingleSheet')]
+        [Parameter(ParameterSetName='ReturnSheet')]
         [String[]]
         $ExcludeProperty,
 
@@ -113,7 +117,7 @@ function Export-GSheet {
 
         # Init variables
         $valueData = @()
-        $sheetArray = @()
+        $sheets = @()
         $firstRun = $true
     }
     
@@ -154,21 +158,48 @@ function Export-GSheet {
                 try {$valueType = $currentValue.GetType().Name}
                 catch {$valueType = 'String'}
 
-                # Set the valueDataType for the Google api call based on the data type
-                if ($valueType -eq 'String') {
-                    $valueDataType = 'stringValue'
-                } elseif ($valueType -eq 'Boolean') {
-                    $valueDataType = 'boolValue'
-                } else {
-                    $valueDataType = 'numberValue'
+                # Set the valueDataType for the Google api call based on the data type and content
+                switch ($valueType) {
+                    'string' {
+                        if ($currentValue -like "=*") {
+                            $valueDataType = 'formulaValue'
+                        } else {
+                            $valueDataType = 'stringValue'
+                        }
+                    }
+                    'datetime' {
+                        # Convert the date to an OLE Automation Date and specify yyyy-MM-dd format
+                        $currentValue = $currentValue.ToOADate()
+                        $valueDataType = 'numberValue'
+                        $format = @{
+                            numberFormat = @{
+                                type = 'DATE'
+                                pattern = 'yyy-mm-dd'
+                            }
+                        }
+                    }
+                    'boolean' {
+                        $valueDataType = 'boolValue'
+                    }
+                    default {
+                        $valueDataType = 'numberValue'
+                    }
                 }
 
                 # Return the value 
-                @{
+                $value = @{
                     userEnteredValue = @{
                         $valueDataType = $currentValue
                     }
                 }
+
+                # Add any special formatting
+                if ($format) {
+                    $value.userEnteredFormat = $format
+                    Remove-Variable 'format'
+                }
+                
+                $value
             }
 
             # Add the object to the valueData array
@@ -176,33 +207,40 @@ function Export-GSheet {
                 values = $values
             }
         }
+
+        # If this is a multi-sheet run, add the sheets to an array
+        foreach ($sheet in $SheetArray) {
+            $sheets += $sheet
+        }
     }
     
     end {
         if ($PSCmdlet.ParameterSetName -in @('SingleSheet','ReturnSheet')) {
             # Build the spreadsheet object if the parameter set is SingleSheet or ReturnSheet
             # Format the spreadsheet object
-            $sheetObject = @{
+            $sheets += @{
                 properties = @{
-                    title = $SheetName
                 }
                 data = @{
                     rowData = $valueData
                 }
             }
 
+            # Add the sheet name if specified
+            if ($SheetName) {
+                $sheets[0].properties.title = $SheetName
+            }
+
             # if -ReturnSheet, return the formatted sheet object only, no upload, etc. 
             if ($ReturnSheet) {
-                return $sheetObject
+                return $sheets
             }
-        } elseif ($PSCmdlet.ParameterSetName -in @('MultiSheet')) {
-            $sheetObject = $sheetArray
         }
 
         # Build the body object
         $body = @{
             properties = @{}
-            sheets = @($sheetObject)
+            sheets = $sheets
         } 
         
         # Set the sheet title if specified
