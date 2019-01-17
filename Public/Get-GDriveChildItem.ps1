@@ -91,6 +91,11 @@ Function Get-GDriveChildItem {
             'corpora=user'
             'fields=nextPageToken,files(id%2CmimeType%2Cname%2Cparents)'
         )
+
+        # Get the "shared with me" items to start
+        $newParams = $params
+        $newParams += 'q=trashed%3Dfalse and sharedWithMe%3Dtrue'
+        $sharedItems = Invoke-PaginatedRestMethod -Uri "$baseUri/files?$($newParams -join '&')" -Method Get
     }
 
     # Determine the target folder ID, create the path if it does not exist
@@ -103,6 +108,10 @@ Function Get-GDriveChildItem {
         $newParams = $params
         $newParams += "q=trashed%3Dfalse and parents+in+'$parentId'"
         $r = Invoke-PaginatedRestMethod -Uri "$baseUri/files?$($newParams -join '&')" -Method Get
+        
+        if ($pathArray.IndexOf($pathItem) -eq 0 -and $sharedItems) {
+            $r.files += $sharedItems.files
+        }
 
         # Find the matching folder
         $matchingFolder = $r.files.Where{
@@ -125,6 +134,9 @@ Function Get-GDriveChildItem {
 
     # Add the results to a PSObject
     $files = @()
+    if ($sharedItems -and !$pathArray) {
+        $files += $sharedItems.files
+    }
     $files += (Invoke-PaginatedRestMethod -Uri "$baseUri/files?$($newParams -join '&')" -Method Get).files
 
     # If Recurse is specified, reprocess for each folder in the current path
