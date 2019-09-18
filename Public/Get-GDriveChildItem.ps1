@@ -1,13 +1,13 @@
 Function Get-GDriveChildItem {
     <#
     .SYNOPSIS
-        List files in Google Drive using the drive API, supports Team Drives
+        List files in Google Drive using the drive API, supports Shared Drives
     .PARAMETER Path
         Specifies a path to one or more locations. Wildcards are permitted. The default location is the root directory.
-    .PARAMETER TeamDriveName
-        Specifies the Team Drive to download the file from.
+    .PARAMETER DriveName
+        Specifies the Shared Drive to download the file from.
 
-        If not included, 'My Drive' is used, rather than a team drive.
+        If not included, 'My Drive' is used, rather than a shared drive.
     .PARAMETER Recurse
         If specified, items in child directories will be listed.
     .PARAMETER RefreshToken
@@ -23,7 +23,7 @@ Function Get-GDriveChildItem {
     [CmdletBinding()]
     Param(
         [String]$Path='*',
-        [String]$TeamDriveName,
+        [String]$DriveName,
         [Switch]$Recurse,
         [String]$RefreshToken,
         [String]$ClientID,
@@ -66,27 +66,27 @@ Function Get-GDriveChildItem {
         $nameFilter = '*'
     }
 
-    # Get the team drive details if a TeamDriveName is specified
-    if ($TeamDriveName) {
+    # Get the shared drive details if a DriveName is specified
+    if ($DriveName) {
         # Set for future API calls
-        $supportsTeamDrives = 'true'
+        $supportsAllDrives = 'true'
 
-        # Lookup all team drives, find the specified teamdrive by name, select the ID
-        $r = Invoke-PaginatedRestMethod -Uri "$baseUri/teamdrives?fields=nextPageToken,teamDrives(id,name)" -Method Get
-        $teamDriveId = $r.teamDrives.Where{$_.name -eq $TeamDriveName}.id
+        # Lookup all shared drives, find the specified teamdrive by name, select the ID
+        $r = Invoke-PaginatedRestMethod -Uri "$baseUri/drives?fields=nextPageToken,drives(id,name)" -Method Get
+        $driveId = $r.drives.Where{$_.name -eq $DriveName}.id
 
         # Set the files.list call parameters
         $params = @(
-            'corpora=teamDrive',
-            'includeTeamDriveItems=true',
-            'supportsTeamDrives=true'
-            "teamDriveId=$teamDriveId"
+            'corpora=drive',
+            'includeItemsFromAllDrives=true',
+            'supportsAllDrives=true'
+            "driveId=$driveId"
             'fields=nextPageToken,files(id%2CmimeType%2Cname%2Cparents)'
         )
     }
     else {
         # Set the files.list call parameters
-        $supportsTeamDrives = 'false'
+        $supportsAllDrives = 'false'
         $params = @(
             'corpora=user'
             'fields=nextPageToken,files(id%2CmimeType%2Cname%2Cparents)'
@@ -99,7 +99,7 @@ Function Get-GDriveChildItem {
     }
 
     # Determine the target folder ID, create the path if it does not exist
-    if ($supportsTeamDrives -eq 'true') {$parentId = $teamDriveId}
+    if ($supportsAllDrives -eq 'true') {$parentId = $driveId}
     else {$parentid = 'root'}
 
     # Iterate through each part of the path, getting the next level until we reach the bottom

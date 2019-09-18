@@ -1,7 +1,7 @@
 Function Get-GDriveItem {
     <#
     .SYNOPSIS
-        Get files from Google Drive using the drive API, supports Team Drives
+        Get files from Google Drive using the drive API, supports Shared Drives
     .PARAMETER Path
         Specifies the path of the location of the item to download.
 
@@ -10,10 +10,10 @@ Function Get-GDriveItem {
         Specifies the name of the item to download.
 
         You can specify the name of the download item in Name, or include it in Path.
-    .PARAMETER TeamDriveName
-        Specifies the Team Drive to download the file from.
+    .PARAMETER DriveName
+        Specifies the Shared Drive to download the file from.
 
-        If not included, 'My Drive' is used, rather than a team drive.
+        If not included, 'My Drive' is used, rather than a shared drive.
     .PARAMETER Recurse
         If specified, items in child directories will be downloaded.
     .PARAMETER DestinationPath
@@ -33,7 +33,7 @@ Function Get-GDriveItem {
 
     [CmdletBinding(DefaultParameterSetName='ByPath')]
     Param(
-        [String]$TeamDriveName,
+        [String]$DriveName,
 
         [Parameter(Mandatory=$true,ParameterSetName='ByPath')]
         [String]$Path,
@@ -75,11 +75,11 @@ Function Get-GDriveItem {
     # Set optional parameters for the Get-GDriveChildItem function call
     $childItemParams = @{}
     if ($Recurse) {$childItemParams['Recurse'] = $true}
-    if ($TeamDriveName) {
-        $supportsTeamDrives = 'true'
-        $childItemParams['TeamDriveName'] = $TeamDriveName
+    if ($DriveName) {
+        $supportsAllDrives = 'true'
+        $childItemParams['DriveName'] = $DriveName
     }
-    else {$supportsTeamDrives = 'false'}
+    else {$supportsAllDrives = 'false'}
 
     [Array]$filesToDownload = Get-GDriveChildItem -Path "$Path\$Name" @childItemParams @gAuthParam
 
@@ -125,7 +125,7 @@ Function Get-GDriveItem {
                     $exportExt = '.json'
                 }
             }
-            $params = "supportsTeamDrives=$supportsTeamDrives&mimeType=$exportMime"
+            $params = "supportsAllDrives=$supportsAllDrives&mimeType=$exportMime"
             $exportFileName = "$DestinationPath\$($_.name)$exportExt"
             Invoke-RestMethod -Uri "$baseUri/files/$($_.id)/export?$params" -Method Get -OutFile $exportFileName
 
@@ -133,7 +133,7 @@ Function Get-GDriveItem {
         # Download binary files
         else {
             $exportFileName = "$DestinationPath\$($_.name)"
-            Invoke-RestMethod -Uri "$baseUri/files/$($_.id)?supportsTeamDrives=$supportsTeamDrives&alt=media" -Method Get -OutFile $exportFileName
+            Invoke-RestMethod -Uri "$baseUri/files/$($_.id)?supportsAllDrives=$supportsAllDrives&alt=media" -Method Get -OutFile $exportFileName
         }
 
         # Return the exported file

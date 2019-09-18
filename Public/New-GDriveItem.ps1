@@ -1,7 +1,7 @@
 Function New-GDriveItem {
     <#
     .SYNOPSIS
-        Uploads files to Google Drive using the drive API, supports Team Drives
+        Uploads files to Google Drive using the drive API, supports Shared Drives
     .PARAMETER Path
         Specifies the path of the location of the new item.
 
@@ -16,10 +16,10 @@ Function New-GDriveItem {
          Options are File and Directory.
     .PARAMETER SourceFile
         Specifies the file to upload to the specified path (File ItemType only).
-    .PARAMETER TeamDriveName
-        Specifies the Team Drive to upload the documents to.
+    .PARAMETER DriveName
+        Specifies the Shared Drive to upload the documents to.
 
-        If not included, 'My Drive' is used, rather than a team drive.
+        If not included, 'My Drive' is used, rather than a shared drive.
     .PARAMETER UseContentAsIndexableText
         Specifies whether or not the file content should be indexed by Google Drive.
     .PARAMETER RefreshToken
@@ -33,7 +33,7 @@ Function New-GDriveItem {
     #>
 
     # TODO: Add -Value support, setting content of a created file
-    # TODO: Better error handling (e.g.: if a Teamdrive doesn't exist, error out)
+    # TODO: Better error handling (e.g.: if a Shared Drive doesn't exist, error out)
     # TODO: Check for conflicting options (Directory, SourceFile), error out preemptively
     # TODO: Return better data, path to file, etc.
     # TODO: Make Name and Path interchangeable, like the way New-Item works
@@ -44,7 +44,7 @@ Function New-GDriveItem {
         [String]$Name,
         [ValidateSet('Directory','File')][String]$ItemType,
         [String]$SourceFile,
-        [String]$TeamDriveName,
+        [String]$DriveName,
         [Bool]$UseContentAsIndexableText=$true,
         [String]$RefreshToken,
         [String]$ClientID,
@@ -82,27 +82,27 @@ Function New-GDriveItem {
     $headers = Get-GAuthHeaders @gAuthParam
     $PSDefaultParameterValues['Invoke-RestMethod:Headers'] = $headers
 
-    # Get the team drive details if a TeamDriveName is specified
-    if ($TeamDriveName) {
+    # Get the shared drive details if a DriveName is specified
+    if ($DriveName) {
         # Set for future API calls
-        $supportsTeamDrives = 'true'
+        $supportsAllDrives = 'true'
 
-        # Lookup all team drives, find the specified teamdrive by name, select the ID
-        $r = Invoke-PaginatedRestMethod -Uri "$baseUri/teamdrives?fields=nextPageToken,teamDrives(id,name)" -Method Get
-        $teamDriveId = $r.teamDrives.Where{$_.name -eq $TeamDriveName}.id
+        # Lookup all shared drives, find the specified shared drive by name, select the ID
+        $r = Invoke-PaginatedRestMethod -Uri "$baseUri/drives?fields=nextPageToken,drives(id,name)" -Method Get
+        $driveId = $r.drives.Where{$_.name -eq $DriveName}.id
 
         # Set the files.list call parameters
         $params = @(
-            'corpora=teamDrive',
-            'includeTeamDriveItems=true',
-            'supportsTeamDrives=true'
-            "teamDriveId=$teamDriveId"
+            'corpora=drive',
+            'includeItemsFromAllDrives=true',
+            'supportsAllDrives=true'
+            "driveId=$driveId"
             'fields=nextPageToken,files(id%2CmimeType%2Cname%2Cparents)'
         )
     }
     else {
         # Set for future API calls
-        $supportsTeamDrives = 'false'
+        $supportsAllDrives = 'false'
         $params = @(
             'corpora=user'
             'fields=nextPageToken,files(id%2CmimeType%2Cname%2Cparents)'
@@ -115,7 +115,7 @@ Function New-GDriveItem {
     }
 
     # Determine the target folder ID, create the path if it does not exist
-    if ($supportsTeamDrives -eq 'true') {$parentId = $teamDriveId}
+    if ($supportsAllDrives -eq 'true') {$parentId = $driveId}
     else {$parentid = 'root'}
 
     # Iterate through each part of the path, create the folder if it does not exist
@@ -148,13 +148,13 @@ Function New-GDriveItem {
             }
 
             # Add context-specific parameters
-            if ($supportsTeamDrives) {$body['teamDriveId'] = $teamDriveId}
+            if ($supportsAllDrives) {$body['driveId'] = $driveId}
 
             # Convert the body to JSON
             $bodyJson = $body | ConvertTo-Json
 
             # Create the folder, set the parentId, return the object details
-            $r = Invoke-RestMethod -Uri "$baseUri/files?supportsTeamDrives=$supportsTeamDrives" -Method Post -Body $bodyJson
+            $r = Invoke-RestMethod -Uri "$baseUri/files?supportsAllDrives=$supportsAllDrives" -Method Post -Body $bodyJson
             $parentId = $r.id
             $r
         }
@@ -176,7 +176,7 @@ Function New-GDriveItem {
         }
 
         # Add context-specific parameters
-        if ($supportsTeamDrives) {$uploadMetadata['teamDriveId'] = $teamDriveId}
+        if ($supportsAllDrives) {$uploadMetadata['driveId'] = $driveId}
         if ($Name) {$uploadMetadata['name'] = $Name}
         else {$uploadMetadata['name'] = $sourceItem.Name}
 
@@ -193,7 +193,7 @@ Function New-GDriveItem {
         }
 
         # Upload the file, return the object details
-        $r = Invoke-RestMethod -Uri "$uploadUri/files?supportsTeamDrives=$supportsTeamDrives&uploadType=multipart" -Method Post -Headers $uploadHeaders -Body $uploadBody
+        $r = Invoke-RestMethod -Uri "$uploadUri/files?supportsAllDrives=$supportsAllDrives&uploadType=multipart" -Method Post -Headers $uploadHeaders -Body $uploadBody
         $r
     }
 }
