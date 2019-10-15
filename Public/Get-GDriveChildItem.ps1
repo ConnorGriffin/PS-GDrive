@@ -71,7 +71,7 @@ Function Get-GDriveChildItem {
         # Set for future API calls
         $supportsAllDrives = 'true'
 
-        # Lookup all shared drives, find the specified teamdrive by name, select the ID
+        # Lookup all shared drives, find the specified Drive by name, select the ID
         $r = Invoke-PaginatedRestMethod -Uri "$baseUri/drives?fields=nextPageToken,drives(id,name)" -Method Get
         $driveId = $r.drives.Where{$_.name -eq $DriveName}.id
 
