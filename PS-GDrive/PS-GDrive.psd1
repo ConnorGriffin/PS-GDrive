@@ -9,7 +9,7 @@
 @{
 
 # Script module or binary module file associated with this manifest.
-RootModule = 'GDrive.psm1'
+RootModule = 'PS-GDrive.psm1'
 
 # Version number of this module.
 ModuleVersion = '1.5.0'
@@ -24,10 +24,10 @@ GUID = 'defd5427-890b-479d-bb0d-2f3ebed9ad66'
 Author = 'Connor Griffin'
 
 # Company or vendor of this module
-CompanyName = 'State of Arizona'
+CompanyName = 'Connor Griffin'
 
 # Copyright statement for this module
-Copyright = '(c) 2018 State if Arizona. All rights reserved.'
+Copyright = '(c) 2019 Connor Griffin and contributors. All rights reserved.'
 
 # Description of the functionality provided by this module
 Description = 'Google Drive API implementation.'
